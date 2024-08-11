@@ -1,1 +1,3 @@
 git+https://github.com/adventurebrew/pakal.git@main
+numpy==2.0.1
+pillow==10.4.0
