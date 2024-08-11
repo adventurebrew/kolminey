@@ -104,7 +104,7 @@ if __name__ == '__main__':
 
     input_path = pathlib.Path(args.input)
     frmt = args.format or input_path.suffix[1:]
-    if format not in ('csv', 'str'):
+    if frmt not in ('csv', 'str'):
         raise ValueError(f'Unknown format {frmt} for {args.input}, please specify with -f')
 
     if frmt == 'str':
