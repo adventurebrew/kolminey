@@ -111,7 +111,7 @@ def encrypt_utf16(st: str, sep: set[str]) -> str:
 
 
 def extract_texts(csv_writer, archive: ZFSArchive):
-    for entry in archive.glob('*.txt'):
+    for entry in itertools.chain(archive.glob('*.txt'), archive.glob('*.str')):
         with entry.open('rb', encoding='cp862') as file:
             content = file.read()
             dlines = content.split(b'\r\n\0')
