@@ -37,6 +37,7 @@ def parse_string_file(strings_data):
         voice = voices[voice:].split(b'\0')[0].decode('ascii') if voice != 0xFFFFFFFF else None
         yield entry, line, voice
 
+
 def write_csv(fname, entries):
     with open(fname, 'w', encoding='utf-8', errors='strict') as f:
         print('index', 'text', 'voice', sep=',', file=f)
@@ -69,7 +70,6 @@ def write_strings_file(entries):
     texts = bytearray()
     voices = bytearray()
     for entry in entries:
-        print(entry)
         index, text, voice = operator.itemgetter('index', 'text', 'voice')(entry)
         eindex = int(index)
         text_offset = len(texts)
@@ -108,11 +108,11 @@ if __name__ == '__main__':
         raise ValueError(f'Unknown format {frmt} for {args.input}, please specify with -f')
 
     if frmt == 'str':
-        output = args.output or input_path.with_suffix('.csv')
+        output = args.output or input_path.with_suffix('.csv').name
         strings_data = pathlib.Path(args.input).read_bytes()
         write_csv(output, parse_string_file(strings_data))
     elif frmt == 'csv':
-        output = args.output or input_path.with_suffix('.str')
+        output = args.output or input_path.with_suffix('.str').name
         entries = list(read_csv(args.input))
         pathlib.Path(output).write_bytes(write_strings_file(entries))
     else:
