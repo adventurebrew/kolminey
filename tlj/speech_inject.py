@@ -99,7 +99,7 @@ def traverse_resource(basedir, arc, path: pathlib.Path, res: ResObject, lines: I
         print(res.rtype, res.subtype, res.index, res.name, line)
 
 
-def load_archive(basedir: pathlib.Path, fname: pathlib.Path, lines: Iterator[dict[str, str]], locs=()):
+def load_archive(basedir: pathlib.Path, fname: pathlib.Path, lines: Iterator[dict[str, str]], patch_dir: pathlib.Path, locs=()):
     with xarc.open(basedir / fname) as arc:
         # with arc.open(fname.with_suffix('.xrc').name, 'rb') as f:
         #     orig = f.read()
@@ -108,21 +108,21 @@ def load_archive(basedir: pathlib.Path, fname: pathlib.Path, lines: Iterator[dic
             for c in res.children:
                 if c.rtype == 'Level':
                     archive_name = build_archive_name(c)
-                    load_archive(basedir, fname.parent / archive_name, lines)
+                    load_archive(basedir, fname.parent / archive_name, lines, patch_dir)
                 elif c.rtype == 'Location':
                     archive_name = build_archive_name(c)
                     assert res.rtype == 'Level'
-                    load_archive(basedir, fname.parent / archive_name, lines)
+                    load_archive(basedir, fname.parent / archive_name, lines, patch_dir)
 
             for loc in locs:
-                load_archive(basedir, fname.parent / loc / f'{loc}.xarc', lines)
+                load_archive(basedir, fname.parent / loc / f'{loc}.xarc', lines, patch_dir)
             traverse_resource(basedir, arc, fname, res, lines)
             patched = patch_resource(res)
 
             # assert orig == patched, (orig, patched)
 
-            ('patch' / fname.parent).mkdir(parents=True, exist_ok=True)
-            ('patch' / fname).write_bytes(patch_archive(basedir, fname, {fname.with_suffix('.xrc').name: patched}))
+            (patch_dir / fname.parent).mkdir(parents=True, exist_ok=True)
+            (patch_dir / fname).write_bytes(patch_archive(basedir, fname, {fname.with_suffix('.xrc').name: patched}))
 
 
 @contextmanager
@@ -133,6 +133,27 @@ def redirect_stdout(file: TextIO):
     sys.stdout = old_stdout
 
 
+def patch_game(basedir: pathlib.Path, csv_reader, patch_dir: pathlib.Path):
+    load_archive(basedir, pathlib.Path('x.xarc'), csv_reader, patch_dir)
+    load_archive(
+        basedir,
+        pathlib.Path('Static/Static.xarc'),
+        csv_reader,
+        patch_dir,
+        locs=(
+            'DiaryFMV',
+            'DiaryIndexLocation',
+            'DiaryLog',
+            'DiaryPages',
+            'LoadSaveLocation',
+            'MainMenuLocation',
+            'OptionLocation',
+        ),
+    )
+
+    assert not next(csv_reader, None)
+
+
 if __name__ == '__main__':
     import argparse
 
@@ -141,22 +162,9 @@ if __name__ == '__main__':
     parser.add_argument('csvpath', type=str, help='File to read texts from')
     args = parser.parse_args()
 
+    patch_dir = pathlib.Path('patch')
+
     with open(args.csvpath, 'r', newline='', encoding='utf-8') as f:
         csv_reader = csv.DictReader(f)
-        load_archive(pathlib.Path(args.basedir), pathlib.Path('x.xarc'), csv_reader)
-        load_archive(
-            pathlib.Path(args.basedir),
-            pathlib.Path('Static/Static.xarc'),
-            csv_reader,
-            locs=(
-                'DiaryFMV',
-                'DiaryIndexLocation',
-                'DiaryLog',
-                'DiaryPages',
-                'LoadSaveLocation',
-                'MainMenuLocation',
-                'OptionLocation',
-            ),
-        )
-
-        assert not next(csv_reader, None)
+        basedir = pathlib.Path(args.basedir)
+        patch_game(basedir, csv_reader, patch_dir)
