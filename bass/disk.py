@@ -7,6 +7,7 @@ from typing import IO, Iterator, NamedTuple
 from pakal.archive import BaseArchive, make_opener, ArchiveIndex, ArchivePath
 
 from rnc_deco import RncDecoder
+import rnccs
 
 
 def load_file(data_disk_handle, file_info):
@@ -31,20 +32,31 @@ def load_file(data_disk_handle, file_info):
 
     input_data = content[22:]
     unpacked = bytearray(decomp_size)
-    decoded = RncDecoder().unpackM1(input_data, size - 22, unpacked)
+    decoded_size = RncDecoder().unpackM1(input_data, size - 22, unpacked)
+    decoded = bytes(rnccs.decompress(input_data))
 
-    print(decoded)
+    print(decoded_size)
 
     if not decoded:  # Unpack returned 0: file was probably not packed.
         print('Actually... it\'s not')
         return content
 
-    assert decoded > 0, decoded
-    if not (flags >> 22) & 0x1:  # do we include the header?
-        decomp_size += 22
-        unpacked = file_header + unpacked
+    decoded2 = bytes(unpacked)
+    # assert a + b'\0' * (decomp_size - len(a)) == b, b[len(a):]
 
-    return bytes(unpacked)
+    assert decoded2.startswith(decoded), (decoded, decoded2)
+    assert len(decoded) <= len(decoded2), (len(decoded), len(decoded2))
+
+    assert decoded_size > 0, decoded_size
+    if not (flags >> 22) & 0x1:  # do we include the header?
+        print('HEADER')
+        # decomp_size += 22
+        decoded = file_header + decoded
+
+    print(decoded2[len(decoded):])
+    assert len(decoded) == decomp_size, (len(decoded), decomp_size)
+
+    return decoded
 
 
 def READ_LE_UINT16(data):
@@ -174,10 +186,22 @@ class DiskArchive(BaseArchive[DiskFileEntry]):
 open = make_opener(DiskArchive)
 
 if __name__ == '__main__':
+    from rnccs import RNCCompressor, decompress
+
     open_archive = open
     output_dir = pathlib.Path('outbin')
 
-    disk_path = 'sky.dsk'
+    disk_path = 'game/sky.dsk'
 
     with open_archive(disk_path) as arc:
-        arc.extractall(output_dir)
+        for fname in arc:
+            print(fname)
+            data = arc.get_file(fname.name).read_bytes()
+
+            recomp = RNCCompressor.compress(data)
+            redecomp = decompress(recomp)
+            assert redecomp == data, (len(redecomp), len(data))
+            # fn = arc.get_file(fname.name)
+            # with fn.open('rb') as f:
+            #     print(f.read())
+        # arc.extractall(output_dir)
