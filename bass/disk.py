@@ -177,7 +177,6 @@ class DiskArchive(BaseArchive[DiskFileEntry]):
             with pathlib.Path(index).open('wb') as index_file:
                 index_file.write(len(self.index).to_bytes(4, byteorder='little'))
                 for fname, entry in self.index.items():
-                    print(fname)
                     index_file.write(int(fname).to_bytes(2, byteorder='little'))
                     index_file.write(write_file_info(entry))
 
