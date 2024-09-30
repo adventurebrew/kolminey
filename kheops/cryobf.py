@@ -1,5 +1,13 @@
+import io
 import struct
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+from pakal.archive import SimpleArchive, make_opener
+
+if TYPE_CHECKING:
+    from pakal.archive import ArchiveIndex, SimpleEntry
+
 
 def read_string(file, length):
     text = file.read(length)
@@ -61,68 +69,68 @@ def encode_path_dict(path_index, new_index, ofile):
             ofile.write(struct.pack('<I', off - 32))
 
 
+class CryoBF(SimpleArchive):
+    def _create_index(self) -> 'ArchiveIndex[SimpleEntry]':
+        if read_string(self._stream, 9) != b"CryoBF - ":
+            raise ValueError("Invalid file format")
+
+        self.ver = read_string(self._stream, 7)
+        zero1 = read_long(self._stream)
+        zero2 = read_long(self._stream)
+        assert zero1 == zero2 == 0
+        info_offset = read_long(self._stream)
+        base_offset = read_long(self._stream)
+        
+        assert self._stream.tell() == base_offset == 32, (self._stream.tell(), base_offset)
+
+        self._stream.seek(info_offset)
+        index = dict(extract(self._stream, base_offset, path=Path()))
+        
+        assert not self._stream.read(), "Not all data was read"
+        return index
+
+
 def main(filename):
     filename = Path(filename)
 
     output_dir = Path("extracted")
     patch_dir = Path("patch")
 
-    with filename.open('rb') as file:
-        if read_string(file, 9) != b"CryoBF - ":
-            raise ValueError("Invalid file format")
-
-        ver = read_string(file, 7)
-        zero1 = read_long(file)
-        zero2 = read_long(file)
-        assert zero1 == zero2 == 0
-        info_offset = read_long(file)
-        base_offset = read_long(file)
-        
-        assert file.tell() == base_offset, (file.tell(), base_offset)
-
-        file.seek(info_offset)
-        index = list(extract(file, base_offset, Path()))
-
-        assert not file.read(), "Not all data was read"
-
-        for fname, (off, size) in index:
-            file.seek(off)
-            (output_dir / fname).parent.mkdir(parents=True, exist_ok=True)
-            (output_dir / fname).write_bytes(file.read(size))
+    with CryoBF(filename) as archive:
+        archive.extractall(output_dir)
 
         # rebuild
 
-        with open(f'{filename.stem}_new.bf', 'wb') as ofile:
+        with io.open(f'{filename.stem}_new.bf', 'wb') as ofile:
             ofile.write(b"CryoBF - ")
-            ofile.write(ver)
+            ofile.write(archive.ver)
             ofile.write(b"\0\0\0\0\0\0\0\0")
-            ofile.write(struct.pack('<I', base_offset))
+            ofile.write(struct.pack('<I', 0))
             ofile.write(struct.pack('<I', 32))
             assert ofile.tell() == 32, (ofile.tell(), 32)
 
-            new_index = []
+            new_index = {}
             base_offset = 32
-            for fname, (off, size) in index:
+            for entry in archive:
                 # print(fname)
-                if not (patch_dir / fname).exists():
-                    file.seek(off)
-                    ofile.write(file.read(size))
-                    new_index.append((fname, (base_offset, size)))
-                    base_offset += size
+                if not (patch_dir / str(entry)).exists():
+                    content = entry.read_bytes()
                 else:
-                    print('patching', fname)
-                    content = (patch_dir / fname).read_bytes()
-                    ofile.write(content)
-                    new_index.append((fname, (base_offset, len(content))))
-                    base_offset += len(content)
+                    print('patching', str(entry))
+                    content = (patch_dir / str(entry)).read_bytes()
+                ofile.write(content)
+                new_index[str(entry)] = (base_offset, len(content))
+                base_offset += len(content)
 
+            it = build_path_dict(new_index.keys())
 
-            it = build_path_dict([fname for fname, _ in new_index])
-
-            encode_path_dict(it, dict(new_index), ofile)
+            encode_path_dict(it, new_index, ofile)
 
             ofile.seek(24)
             ofile.write(struct.pack('<I', base_offset))
+
+
+open = make_opener(CryoBF)
 
 if __name__ == "__main__":
     import argparse
@@ -130,4 +138,3 @@ if __name__ == "__main__":
     parser.add_argument('filename')
     args = parser.parse_args()
     main(args.filename)
-
