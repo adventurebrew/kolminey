@@ -40,8 +40,15 @@ if __name__ == '__main__':
 
             ext = Path('ext') / fntfile.stem
             ext.mkdir(exist_ok=True, parents=True)
-            for c in range(tblsiz):
-                char = info[chartbl[c]]
-                x1, y1, x2, y2 = char[:4]
-                cim = im.crop((x1, y1, x2, y2))
-                cim.save(ext / fntfile.with_name(fntfile.stem + f'_{c}.png').name)
+            with open(fntfile.with_suffix('.txt').name, 'w') as f:
+                print('crops:  # x1, y1, x2, y2, base, dummy', file=f)
+                for idx, cinfo in enumerate(info):
+                    print(f'  {idx}:', *cinfo, file=f)
+                print('charmap:', file=f)
+                for c in range(tblsiz):
+                    print(f'  {c}: {chartbl[c]}  # {repr(bytes([c]))[2:-1]}', file=f)
+
+                    char = info[chartbl[c]]
+                    x1, y1, x2, y2 = char[:4]
+                    cim = im.crop((x1, y1, x2, y2))
+                    cim.save(ext / fntfile.with_name(fntfile.stem + f'_{c}.png').name)

@@ -154,7 +154,7 @@ def write_lub_files(basepath: str | os.PathLike[str], lines: Iterable[dict[str, 
             text_string = line['String'].encode('windows-1252')
             assert orig_text == text_string, (orig_text, text_string)
             if line['Translation']:
-                workstring = '\n'.join(get_display(s) for s in textwrap.wrap(line['Translation'], 28))
+                workstring = '\n'.join(get_display(s) for s in textwrap.wrap(line['Translation'], 21))
                 text_string = workstring.encode('windows-1255')
             data[id_offset + 10 : id_offset + 14 + orig_size] = encode_lua_string(text_string)
         Path(spath).with_suffix('.lub').write_bytes(data)
