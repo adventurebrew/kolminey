@@ -99,6 +99,16 @@ def print_resource(basedir, arc, path: pathlib.Path, res: ResObject, indent: int
     for c in res.children:
         print_resource(basedir, arc, path, c, indent=indent + 1)
 
+    if res.rtype == 'PATTable':
+        print(
+            quote(str(path)),
+            quote(res.name.decode('windows-1252')),
+            quote(''),
+            quote(res.name.decode('windows-1252')),
+            quote(''),
+            sep=',',
+        )
+
     if res.rtype == 'Image' and res.subtype == 4:
         with io.BytesIO(res.data) as s:
             # ALL IMAGES
@@ -120,10 +130,10 @@ def print_resource(basedir, arc, path: pathlib.Path, res: ResObject, indent: int
 
         print(
             quote(str(path)),
-            quote(res.name.decode('windows-1251')),
+            quote(res.name.decode('windows-1252')),
             quote(''),
-            quote(imagefile.decode('windows-1251')),
-            quote(text.decode('windows-1251')),
+            quote(imagefile.decode('windows-1252')),
+            quote(text.decode('windows-1252')),
             sep=',',
         )
 
@@ -162,10 +172,10 @@ def print_resource(basedir, arc, path: pathlib.Path, res: ResObject, indent: int
 
         print(
             quote(str(path)),
-            quote(res.name.decode('windows-1251')),
+            quote(res.name.decode('windows-1252')),
             char,
-            quote(soundfile.decode('windows-1251')),
-            quote(text.decode('windows-1251')),
+            quote(soundfile.decode('windows-1252')),
+            quote(text.decode('windows-1252')),
             sep=',',
         )
 

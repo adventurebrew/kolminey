@@ -38,10 +38,19 @@ def traverse_resource(basedir, arc, path: pathlib.Path, res: ResObject, lines: I
     for c in res.children:
         traverse_resource(basedir, arc, path, c, lines)
 
+    if res.rtype == 'PATTable':
+        line = next(lines)
+        print(line)
+        assert str(path) == line['Archive'], (str(path), line['Archive'])
+        assert res.name.decode('windows-1252') in {line['Name'], line['Translation'].encode('windows-1255').decode('windows-1252')}, (res.name, line['Name'], line['Translation'])
+
+        if line.get('Translation'):
+            res.name = line['Translation'].encode('windows-1255')
+
     if res.rtype == 'Image' and res.subtype == 4:
         line = next(lines)
         assert str(path) == line['Archive'], (str(path), line['Archive'])
-        assert res.name.decode('windows-1251') == line['Name'], (res.name, line['Name'])
+        assert res.name.decode('windows-1252') == line['Name'], (res.name, line['Name'])
 
         orig = res.data
         with io.BytesIO(res.data) as s:
@@ -62,7 +71,7 @@ def traverse_resource(basedir, arc, path: pathlib.Path, res: ResObject, lines: I
             color = struct.unpack('<4B', s.read(4))  # last byte is ignored
             font = int.from_bytes(s.read(4), 'little')
 
-        text = line['Text'].replace('\r\r\n', '\r\n').encode('windows-1251')
+        text = line['Text'].replace('\r\r\n', '\r\n').encode('windows-1252')
         translation = line.get('Translation')
         if translation:
             text = translation.replace('\r\r\n', '\r\n').encode('windows-1255')
@@ -89,9 +98,9 @@ def traverse_resource(basedir, arc, path: pathlib.Path, res: ResObject, lines: I
     if res.rtype == 'Speech':
         line = next(lines)
         assert str(path) == line['Archive'], (str(path), line['Archive'])
-        assert res.name.decode('windows-1251') == line['Name'], (res.name, line['Name'])
+        assert res.name.decode('windows-1252') == line['Name'], (res.name, line['Name'])
 
-        text = line['Text'].replace('\r\r\n', '\r\n').encode('windows-1251')
+        text = line['Text'].replace('\r\r\n', '\r\n').encode('windows-1252')
         translation = line.get('Translation')
         if translation:
             text = translation.replace('\r\r\n', '\r\n').encode('windows-1255')

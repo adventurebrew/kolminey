@@ -5,7 +5,7 @@ import requests
 
 from speech_inject import patch_game
 
-PATTERN = 'https://docs.google.com/spreadsheets/d/{key}/gviz/tq?tqx=out:csv&sheet={sheet_name}'
+PATTERN = 'https://docs.google.com/spreadsheets/d/{key}/export?format=csv&sheet={sheet_name}'
 
 def download_csv_sheet(key, sheet_name):
     url = PATTERN.format(key=key, sheet_name=sheet_name)
