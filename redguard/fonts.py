@@ -5,7 +5,7 @@ import struct
 
 import numpy as np
 
-from grid import create_char_grid
+from grid import convert_to_pil_image, create_char_grid
 
 
 UINT16LE_X5 = struct.Struct('<5H')
@@ -21,6 +21,10 @@ def untag(stream):
 def read_chunks(stream):
     while True:
         htag, data = untag(stream)
+        if data[-4:] == b'END ':
+            data = data[:-4]
+            yield htag, data
+            break
         if htag == b'END ':
             break
         yield htag, data
@@ -53,6 +57,25 @@ def read_chars(data: bytes):
             last_idx = idx
 
 
+def read_image(data):
+    while True:
+        header = data[:18]
+        if not header:
+            break
+        data = data[18:]
+        w, h = struct.unpack('<2h', header[2:6])
+        if w < 0 or h < 0:
+            print('WARNING: Negative dimensions:', w, h)
+            return
+        im_data = data[:w * h]
+        if len(im_data) < w * h:
+            print('WARNING: Incomplete image data:', len(im_data), w, h)
+            return
+        yield np.frombuffer(im_data, dtype=np.uint8).reshape((h, w))
+        data = data[w * h :]
+    assert not data, data
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process font files.')
     parser.add_argument(
@@ -74,27 +97,39 @@ if __name__ == '__main__':
         with file.open('rb') as f:
             chunks = list(read_chunks(f))
             htag, header = chunks[0]
-            assert htag == b'FNHD'
-            assert len(header) == 56, len(header)
+            assert htag in {b'FNHD', b'BMHD'}, htag
+            if htag == b'BMHD':
+                assert len(header) == 34, len(header)
+            if htag == b'FNHD':
+                assert len(header) == 56, len(header)
             # TODO: Figure out the header format
             print(header[:32], header[32:])
             print('Chunks:', [tag for tag, _ in chunks])
             palette = None
 
-            for htag, data in chunks[1:]:
-                if htag == b'FPAL':  # Used in ARIALVS.FNT
+            for ctag, data in chunks[1:]:
+                if ctag == b'FPAL':  # Used in ARIALVS.FNT
                     assert palette is None, palette
                     assert len(data) == 768, len(data)
                     palette = [x << 2 for x in data]
-                if htag == b'BPAL':
+                if ctag == b'BPAL':
                     assert palette is None, palette
                     assert len(data) == 768, len(data)
                     palette = [x << 2 for x in data]
-                if htag == b'FBMP':
+                if ctag == b'FBMP':
                     glyphs = list(read_chars(data))
+                if ctag == b'BBMP':
+                    image = list(read_image(data))
 
-                    chars = range(32, 32 + len(glyphs))
+            if htag == b'FNHD':
+                chars = range(32, 32 + len(glyphs))
 
-                    im = create_char_grid(chars.stop, zip(chars, glyphs))
+                im = create_char_grid(chars.stop, zip(chars, glyphs))
+                im.putpalette(palette)
+                im.save(str(f'{file.name}.png'))
+
+            if htag == b'BMHD':
+                for fidx, frame in enumerate(image):
+                    im = convert_to_pil_image(frame)
                     im.putpalette(palette)
-                    im.save(str(f'{file.name}.png'))
+                    im.save(str(f'{file.name}_{fidx}.png'))
