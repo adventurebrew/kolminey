@@ -100,10 +100,11 @@ if __name__ == '__main__':
             assert htag in {b'FNHD', b'BMHD'}, htag
             if htag == b'BMHD':
                 assert len(header) == 34, len(header)
+                num_frames = struct.unpack('<H', header[-2:])[0]
             if htag == b'FNHD':
                 assert len(header) == 56, len(header)
-            # TODO: Figure out the header format
-            print(header[:32], header[32:])
+                unk1, line_height = struct.unpack('<2H', header[42:46])
+                min_char, num_frames = struct.unpack('<2H', header[46:50])
             print('Chunks:', [tag for tag, _ in chunks])
             palette = None
 
@@ -122,13 +123,17 @@ if __name__ == '__main__':
                     image = list(read_image(data))
 
             if htag == b'FNHD':
-                chars = range(32, 32 + len(glyphs))
+                if len(glyphs) != num_frames:
+                    print('WARNING: Number of frames does not match:', len(glyphs), num_frames)
+                chars = range(min_char, min_char + num_frames)
 
-                im = create_char_grid(chars.stop, zip(chars, glyphs))
+                im = create_char_grid(chars.stop, zip(chars, glyphs, strict=True))
                 im.putpalette(palette)
                 im.save(str(f'{file.name}.png'))
 
             if htag == b'BMHD':
+                if len(image) != num_frames:
+                    print('WARNING: Number of frames does not match:', len(image), num_frames)
                 for fidx, frame in enumerate(image):
                     im = convert_to_pil_image(frame)
                     im.putpalette(palette)
